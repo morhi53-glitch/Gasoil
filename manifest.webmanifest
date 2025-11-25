@@ -1,0 +1,9 @@
+{
+  "name": "Control de Gasoil de Barcos",
+  "short_name": "Gasoil Barcos",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0d47a1",
+  "icons": []
+}

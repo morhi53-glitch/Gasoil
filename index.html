@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Control de Gasoil Barcos</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d47a1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f5f5f5;
+      color: #222;
+    }
+    header {
+      background: #0d47a1;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+    h2 {
+      margin-top: 1.5rem;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 0.25rem;
+    }
+    .card {
+      background: white;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    label {
+      display: block;
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+    }
+    input, select, button {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.4rem 0.5rem;
+      margin-top: 0.2rem;
+      font-size: 0.95rem;
+    }
+    input[type="file"] {
+      padding: 0;
+    }
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background: #0d47a1;
+      color: white;
+      margin-top: 0.8rem;
+    }
+    button.secondary {
+      background: #555;
+    }
+    button.danger {
+      background: #b00020;
+      width: auto;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.8rem;
+      margin-top: 0;
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .col {
+      flex: 1 1 200px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 0.35rem 0.4rem;
+      text-align: left;
+      vertical-align: middle;
+    }
+    th {
+      background: #eeeeee;
+    }
+    .totals {
+      margin-top: 0.5rem;
+      font-weight: bold;
+    }
+    @media print {
+      header, .no-print, .danger {
+        display: none !important;
+      }
+      body {
+        background: white;
+      }
+      .card {
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Control de Gasoil de Barcos</h1>
+  <p style="margin:0;font-size:0.9rem;">Horas trabajadas × consumo por hora + stock en tanques</p>
+</header>
+
+<main>
+  <!-- Barcos -->
+  <section class="card">
+    <h2>Barcos y tanques</h2>
+    <div class="row">
+      <div class="col">
+        <label>Nombre del barco</label>
+        <input id="boatName" type="text" placeholder="Ej: Remolcador 1">
+      </div>
+      <div class="col">
+        <label>Consumo por hora (litros/h)</label>
+        <input id="boatConsumption" type="number" step="0.01" min="0">
+      </div>
+      <div class="col">
+        <label>Gasoil inicial en tanques (L)</label>
+        <input id="boatInitialFuel" type="number" step="0.01" min="0" value="0">
+      </div>
+    </div>
+    <button id="addBoatBtn">Añadir barco</button>
+
+    <table id="boatsTable">
+      <thead>
+      <tr>
+        <th>Barco</th>
+        <th>Consumo (L/h)</th>
+        <th>Gasoil en tanque (L)</th>
+        <th class="no-print">Acciones</th>
+      </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <!-- Partes de trabajo -->
+  <section class="card">
+    <h2>Registro de horas (consumo)</h2>
+    <div class="row">
+      <div class="col">
+        <label>Fecha</label>
+        <input id="entryDate" type="date">
+      </div>
+      <div class="col">
+        <label>Barco</label>
+        <select id="entryBoat"></select>
+      </div>
+      <div class="col">
+        <label>Horas trabajadas</label>
+        <input id="entryHours" type="number" step="0.01" min="0">
+      </div>
+    </div>
+    <button id="addEntryBtn">Añadir registro</button>
+    <p style="font-size:0.8rem;margin-top:0.5rem;">
+      Al guardar, se descuenta del tanque: <strong>horas × consumo (L/h)</strong>.
+    </p>
+  </section>
+
+  <!-- Repostajes -->
+  <section class="card">
+    <h2>Repostajes (entradas de gasoil)</h2>
+    <div class="row">
+      <div class="col">
+        <label>Fecha</label>
+        <input id="refuelDate" type="date">
+      </div>
+      <div class="col">
+        <label>Barco</label>
+        <select id="refuelBoat"></select>
+      </div>
+      <div class="col">
+        <label>Litros repostados</label>
+        <input id="refuelLiters" type="number" step="0.01" min="0">
+      </div>
+    </div>
+    <button id="addRefuelBtn">Añadir repostaje</button>
+
+    <table id="refuelsTable">
+      <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Barco</th>
+        <th>Litros</th>
+        <th class="no-print">Acciones</th>
+      </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <!-- Filtros, listado, exportar e importar -->
+  <section class="card">
+    <h2>Listado / Exportar / Importar</h2>
+    <div class="row">
+      <div class="col">
+        <label>Desde fecha</label>
+        <input id="filterFrom" type="date">
+      </div>
+      <div class="col">
+        <label>Hasta fecha</label>
+        <input id="filterTo" type="date">
+      </div>
+      <div class="col">
+        <label>&nbsp;</label>
+        <button id="applyFilterBtn">Aplicar filtro</button>
+      </div>
+    </div>
+
+    <div class="no-print" style="margin-top:0.5rem; display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-start;">
+      <!-- Horas -->
+      <div style="display:flex; flex-direction:column; gap:0.25rem; max-width:260px;">
+        <strong>Horas</strong>
+        <button id="exportCsvBtn">Exportar CSV horas</button>
+        <label for="importFile">Importar CSV de horas (Fecha;Barco;Horas)</label>
+        <input id="importFile" type="file" accept=".csv,text/csv">
+        <button id="importCsvBtn" class="secondary">Importar CSV horas</button>
+      </div>
+
+      <!-- Repostajes -->
+      <div style="display:flex; flex-direction:column; gap:0.25rem; max-width:260px;">
+        <strong>Repostajes</strong>
+        <button id="exportRefuelsCsvBtn">Exportar CSV repostajes</button>
+        <label for="importRefuelsFile">Importar CSV de repostajes (Fecha;Barco;Litros)</label>
+        <input id="importRefuelsFile" type="file" accept=".csv,text/csv">
+        <button id="importRefuelsCsvBtn" class="secondary">Importar CSV repostajes</button>
+      </div>
+
+      <!-- Otros -->
+      <div style="display:flex; flex-direction:column; gap:0.25rem; max-width:260px;">
+        <strong>Otros</strong>
+        <button id="printBtn" class="secondary">Imprimir</button>
+      </div>
+    </div>
+
+    <!-- Listado de horas -->
+    <table id="entriesTable">
+      <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Barco</th>
+        <th>Horas</th>
+        <th>Consumo (L/h)</th>
+        <th>Gasoil usado (L)</th>
+        <th class="no-print">Acciones</th>
+      </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="totals" id="totals"></div>
+
+    <!-- EXPORT CSV SOLO TEXTO PARA iPHONE (HORAS) -->
+    <textarea id="csvText"
+              style="width:100%;height:150px;display:none;margin-top:0.5rem;"></textarea>
+    <p id="csvHelp"
+       style="font-size:0.8rem;display:none;">
+      CSV de horas generado (iPhone). Mantén pulsado para seleccionar y copiar, luego pégalo en un fichero .csv.
+    </p>
+
+    <!-- EXPORT CSV SOLO TEXTO PARA iPHONE (REPOSTAJES) -->
+    <textarea id="csvTextRefuels"
+              style="width:100%;height:150px;display:none;margin-top:0.5rem;"></textarea>
+    <p id="csvHelpRefuels"
+       style="font-size:0.8rem;display:none;">
+      CSV de repostajes generado (iPhone). Mantén pulsado para seleccionar y copiar, luego pégalo en un fichero .csv.
+    </p>
+  </section>
+</main>
+
+<script>
+  const STORAGE_KEY_BOATS = 'gasoil_boats_v2';
+  const STORAGE_KEY_ENTRIES = 'gasoil_entries_v1';
+  const STORAGE_KEY_REFUELS = 'gasoil_refuels_v1';
+
+  function loadBoats() {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY_BOATS) || '[]');
+    return raw.map(b => ({
+      id: b.id,
+      name: b.name,
+      consumption: Number(b.consumption) || 0,
+      fuel: Number(b.fuel ?? b.fuelStock ?? 0) || 0
+    }));
+  }
+  function saveBoats(boats) {
+    localStorage.setItem(STORAGE_KEY_BOATS, JSON.stringify(boats));
+  }
+  function loadEntries() {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY_ENTRIES) || '[]');
+  }
+  function saveEntries(entries) {
+    localStorage.setItem(STORAGE_KEY_ENTRIES, JSON.stringify(entries));
+  }
+  function loadRefuels() {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY_REFUELS) || '[]');
+  }
+  function saveRefuels(refuels) {
+    localStorage.setItem(STORAGE_KEY_REFUELS, JSON.stringify(refuels));
+  }
+
+  function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+  }
+  function formatDateISOToES(iso) {
+    if (!iso) return '';
+    const [y,m,d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  function parseDateESToISO(text) {
+    const parts = text.split(/[\/]/);
+    if (parts.length !== 3) return null;
+    const [d, m, y] = parts.map(p => p.trim());
+    if (!d || !m || !y) return null;
+    return `${y.padStart(4,'0')}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+
+  function renderBoatsSelect(boats) {
+    const selects = [document.getElementById('entryBoat'), document.getElementById('refuelBoat')];
+    selects.forEach(select => {
+      select.innerHTML = '';
+      if (boats.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'Añade un barco primero';
+        select.appendChild(opt);
+        return;
+      }
+      boats.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.id;
+        opt.textContent = b.name;
+        select.appendChild(opt);
+      });
+    });
+  }
+
+  function renderBoatsTable(boats) {
+    const tbody = document.querySelector('#boatsTable tbody');
+    tbody.innerHTML = '';
+    boats.forEach(b => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${b.name}</td>
+        <td>${b.consumption.toFixed(2)}</td>
+        <td>${b.fuel.toFixed(2)}</td>
+        <td class="no-print">
+          <button class="danger" onclick="deleteBoat('${b.id}')">Eliminar</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderRefuelsTable() {
+    const refuels = loadRefuels();
+    const boats = loadBoats();
+    const tbody = document.querySelector('#refuelsTable tbody');
+    tbody.innerHTML = '';
+
+    refuels
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .forEach(r => {
+        const boat = boats.find(b => b.id === r.boatId);
+        const boatName = boat ? boat.name : 'Desconocido';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${formatDateISOToES(r.date)}</td>
+          <td>${boatName}</td>
+          <td>${r.liters.toFixed(2)}</td>
+          <td class="no-print">
+            <button class="danger" onclick="deleteRefuel('${r.id}')">Eliminar</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+  }
+
+  function getFilteredEntries() {
+    const entries = loadEntries();
+    const boats = loadBoats();
+    const from = document.getElementById('filterFrom').value;
+    const to = document.getElementById('filterTo').value;
+
+    return entries
+      .filter(e => {
+        if (from && e.date < from) return false;
+        if (to && e.date > to) return false;
+        return true;
+      })
+      .map(e => {
+        const boat = boats.find(b => b.id === e.boatId);
+        const consumption = boat ? boat.consumption : 0;
+        const fuel = e.hours * consumption;
+        return {
+          ...e,
+          boatName: boat ? boat.name : 'Desconocido',
+          consumption,
+          fuel
+        };
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  function renderEntriesTable() {
+    const rows = getFilteredEntries();
+    const tbody = document.querySelector('#entriesTable tbody');
+    tbody.innerHTML = '';
+
+    let totalHours = 0;
+    let totalFuel = 0;
+
+    rows.forEach(r => {
+      totalHours += r.hours;
+      totalFuel += r.fuel;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${formatDateISOToES(r.date)}</td>
+        <td>${r.boatName}</td>
+        <td>${r.hours.toFixed(2)}</td>
+        <td>${r.consumption.toFixed(2)}</td>
+        <td>${r.fuel.toFixed(2)}</td>
+        <td class="no-print">
+          <button class="danger" onclick="deleteEntry('${r.id}')">Eliminar</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('totals').textContent =
+      `Total horas: ${totalHours.toFixed(2)} — Total gasoil consumido: ${totalFuel.toFixed(2)} L`;
+  }
+
+  function isIOS() {
+    const ua = navigator.userAgent || navigator.vendor || window.opera || "";
+    return /iPad|iPhone|iPod/.test(ua);
+  }
+
+  // -------- EXPORT HORAS ----------
+  function exportCSV() {
+    const rows = getFilteredEntries();
+    if (rows.length === 0) {
+      alert('No hay datos para exportar.');
+      return;
+    }
+
+    const header = ['Fecha', 'Barco', 'Horas', 'Consumo_L_h', 'Gasoil_L'];
+    const lines = [header.join(';')];
+
+    rows.forEach(r => {
+      lines.push([
+        formatDateISOToES(r.date),
+        r.boatName,
+        r.hours.toFixed(2),
+        r.consumption.toFixed(2),
+        r.fuel.toFixed(2)
+      ].join(';'));
+    });
+
+    const csv = lines.join('
+');
+
+    if (isIOS()) {
+      const ta = document.getElementById('csvText');
+      const help = document.getElementById('csvHelp');
+      ta.style.display = 'block';
+      help.style.display = 'block';
+      ta.value = csv;
+      ta.focus();
+      ta.select();
+    } else {
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      const now = new Date();
+      const fname = `gasoil_horas_${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}.csv`;
+      a.download = fname;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  // -------- EXPORT REPOSTAJES ----------
+  function exportRefuelsCSV() {
+    const refuels = loadRefuels();
+    const boats = loadBoats();
+    if (refuels.length === 0) {
+      alert('No hay repostajes para exportar.');
+      return;
+    }
+
+    const header = ['Fecha', 'Barco', 'Litros'];
+    const lines = [header.join(';')];
+
+    refuels
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .forEach(r => {
+        const boat = boats.find(b => b.id === r.boatId);
+        const name = boat ? boat.name : 'Desconocido';
+        lines.push([
+          formatDateISOToES(r.date),
+          name,
+          (r.liters || 0).toFixed(2)
+        ].join(';'));
+      });
+
+    const csv = lines.join('
+');
+
+    if (isIOS()) {
+      const ta = document.getElementById('csvTextRefuels');
+      const help = document.getElementById('csvHelpRefuels');
+      ta.style.display = 'block';
+      help.style.display = 'block';
+      ta.value = csv;
+      ta.focus();
+      ta.select();
+    } else {
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      const now = new Date();
+      const fname = `gasoil_repostajes_${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}.csv`;
+      a.download = fname;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  // -------- IMPORT HORAS + RECALCULO FUEL ----------
+  function importCSVFromFile(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const text = e.target.result;
+      const lines = text.split(/?
+/).map(l => l.trim()).filter(l => l);
+      if (lines.length === 0) {
+        alert('El archivo está vacío.');
+        return;
+      }
+
+      if (!confirm('Se borrarán todos los registros actuales de horas y se sustituirán por los del CSV. ¿Continuar?')) {
+        return;
+      }
+
+      let boats = loadBoats();
+      const oldEntries = loadEntries();
+      const refuels = loadRefuels();
+
+      const boatMap = {};
+      boats.forEach(b => { boatMap[b.id] = b; });
+
+      // fuel_inicial = fuel_actual - refuels + consumo
+      const initialFuelByBoat = {};
+      boats.forEach(b => {
+        initialFuelByBoat[b.id] = b.fuel || 0;
+      });
+
+      refuels.forEach(r => {
+        if (!initialFuelByBoat[r.boatId]) initialFuelByBoat[r.boatId] = 0;
+        initialFuelByBoat[r.boatId] -= (r.liters || 0);
+      });
+
+      oldEntries.forEach(e => {
+        const boat = boatMap[e.boatId];
+        const cons = boat ? (boat.consumption || 0) : 0;
+        const used = (e.hours || 0) * cons;
+        if (!initialFuelByBoat[e.boatId]) initialFuelByBoat[e.boatId] = 0;
+        initialFuelByBoat[e.boatId] += used;
+      });
+
+      let startIndex = 0;
+      const firstLine = lines[0].toLowerCase();
+      if (firstLine.includes('fecha') && firstLine.includes('barco')) {
+        startIndex = 1;
+      }
+
+      let newEntries = [];
+      let importedCount = 0;
+      let skippedNoBoat = 0;
+
+      for (let i = startIndex; i < lines.length; i++) {
+        const line = lines[i];
+        const parts = line.split(/[;,	]/);
+        if (parts.length < 3) continue;
+
+        const fechaTxt = parts[0].trim();
+        const boatName = parts[1].trim();
+        const horasTxt = parts[2].trim();
+
+        if (!fechaTxt || !boatName || !horasTxt) continue;
+
+        const isoDate = parseDateESToISO(fechaTxt) || fechaTxt;
+        const horas = parseFloat(horasTxt.replace(',', '.'));
+        if (!isoDate || isNaN(horas) || horas <= 0) continue;
+
+        let boatsLower = boats.map(b => ({...b, _nameLower: b.name.toLowerCase()}));
+        let boat = boatsLower.find(b => b._nameLower === boatName.toLowerCase());
+
+        if (!boat) {
+          skippedNoBoat++;
+          continue;
+        }
+
+        newEntries.push({
+          id: generateId(),
+          date: isoDate,
+          boatId: boat.id,
+          hours: horas
+        });
+        importedCount++;
+      }
+
+      // Guardamos nuevas horas
+      saveEntries(newEntries);
+
+      // Recalcular fuel: fuel_nuevo = fuel_inicial + refuels - consumo_nuevo
+      const newFuelByBoat = {};
+      boats.forEach(b => {
+        newFuelByBoat[b.id] = initialFuelByBoat[b.id] || 0;
+      });
+
+      refuels.forEach(r => {
+        if (!newFuelByBoat[r.boatId]) newFuelByBoat[r.boatId] = 0;
+        newFuelByBoat[r.boatId] += (r.liters || 0);
+      });
+
+      newEntries.forEach(e => {
+        const boat = boatMap[e.boatId];
+        const cons = boat ? (boat.consumption || 0) : 0;
+        const used = (e.hours || 0) * cons;
+        if (!newFuelByBoat[e.boatId]) newFuelByBoat[e.boatId] = 0;
+        newFuelByBoat[e.boatId] = Math.max(0, newFuelByBoat[e.boatId] - used);
+      });
+
+      boats = boats.map(b => ({
+        ...b,
+        fuel: newFuelByBoat[b.id] != null ? newFuelByBoat[b.id] : (b.fuel || 0)
+      }));
+
+      saveBoats(boats);
+      renderEntriesTable();
+      renderBoatsTable(boats);
+
+      let msg = `Importadas ${importedCount} líneas de horas.`;
+      if (skippedNoBoat > 0) {
+        msg += ` Saltadas ${skippedNoBoat} por no tener el barco dado de alta.`;
+      }
+      alert(msg);
+    };
+    reader.onerror = function() {
+      alert('Error leyendo el archivo.');
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+
+  // -------- IMPORT REPOSTAJES + RECALCULO FUEL ----------
+  function importRefuelsCSVFromFile(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const text = e.target.result;
+      const lines = text.split(/?
+/).map(l => l.trim()).filter(l => l);
+      if (lines.length === 0) {
+        alert('El archivo está vacío.');
+        return;
+      }
+
+      if (!confirm('Se borrarán todos los repostajes actuales y se sustituirán por los del CSV. ¿Continuar?')) {
+        return;
+      }
+
+      let boats = loadBoats();
+      const entries = loadEntries();
+      const oldRefuels = loadRefuels();
+
+      const boatMap = {};
+      boats.forEach(b => { boatMap[b.id] = b; });
+
+      // fuel_inicial = fuel_actual - refuels + consumo
+      const initialFuelByBoat = {};
+      boats.forEach(b => {
+        initialFuelByBoat[b.id] = b.fuel || 0;
+      });
+
+      oldRefuels.forEach(r => {
+        if (!initialFuelByBoat[r.boatId]) initialFuelByBoat[r.boatId] = 0;
+        initialFuelByBoat[r.boatId] -= (r.liters || 0);
+      });
+
+      entries.forEach(e => {
+        const boat = boatMap[e.boatId];
+        const cons = boat ? (boat.consumption || 0) : 0;
+        const used = (e.hours || 0) * cons;
+        if (!initialFuelByBoat[e.boatId]) initialFuelByBoat[e.boatId] = 0;
+        initialFuelByBoat[e.boatId] += used;
+      });
+
+      let startIndex = 0;
+      const firstLine = lines[0].toLowerCase();
+      if (firstLine.includes('fecha') && firstLine.includes('barco')) {
+        startIndex = 1;
+      }
+
+      let newRefuels = [];
+      let importedCount = 0;
+      let skippedNoBoat = 0;
+
+      for (let i = startIndex; i < lines.length; i++) {
+        const line = lines[i];
+        const parts = line.split(/[;,	]/);
+        if (parts.length < 3) continue;
+
+        const fechaTxt = parts[0].trim();
+        const boatName = parts[1].trim();
+        const litrosTxt = parts[2].trim();
+
+        if (!fechaTxt || !boatName || !litrosTxt) continue;
+
+        const isoDate = parseDateESToISO(fechaTxt) || fechaTxt;
+        const litros = parseFloat(litrosTxt.replace(',', '.'));
+        if (!isoDate || isNaN(litros) || litros <= 0) continue;
+
+        let boatsLower = boats.map(b => ({...b, _nameLower: b.name.toLowerCase()}));
+        let boat = boatsLower.find(b => b._nameLower === boatName.toLowerCase());
+
+        if (!boat) {
+          skippedNoBoat++;
+          continue;
+        }
+
+        newRefuels.push({
+          id: generateId(),
+          date: isoDate,
+          boatId: boat.id,
+          liters: litros
+        });
+        importedCount++;
+      }
+
+      // Guardamos nuevos repostajes
+      saveRefuels(newRefuels);
+
+      // Recalcular fuel: fuel_nuevo = fuel_inicial + nuevos repostajes - consumo
+      const newFuelByBoat = {};
+      boats.forEach(b => {
+        newFuelByBoat[b.id] = initialFuelByBoat[b.id] || 0;
+      });
+
+      newRefuels.forEach(r => {
+        if (!newFuelByBoat[r.boatId]) newFuelByBoat[r.boatId] = 0;
+        newFuelByBoat[r.boatId] += (r.liters || 0);
+      });
+
+      entries.forEach(e => {
+        const boat = boatMap[e.boatId];
+        const cons = boat ? (boat.consumption || 0) : 0;
+        const used = (e.hours || 0) * cons;
+        if (!newFuelByBoat[e.boatId]) newFuelByBoat[e.boatId] = 0;
+        newFuelByBoat[e.boatId] = Math.max(0, newFuelByBoat[e.boatId] - used);
+      });
+
+      boats = boats.map(b => ({
+        ...b,
+        fuel: newFuelByBoat[b.id] != null ? newFuelByBoat[b.id] : (b.fuel || 0)
+      }));
+
+      saveBoats(boats);
+      renderBoatsTable(boats);
+      renderRefuelsTable();
+
+      let msg = `Importadas ${importedCount} líneas de repostajes.`;
+      if (skippedNoBoat > 0) {
+        msg += ` Saltadas ${skippedNoBoat} por no tener el barco dado de alta.`;
+      }
+      alert(msg);
+    };
+    reader.onerror = function() {
+      alert('Error leyendo el archivo.');
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+
+  function deleteBoat(boatId) {
+    if (!confirm('¿Eliminar este barco y todos sus registros y repostajes?')) return;
+    let boats = loadBoats().filter(b => b.id !== boatId);
+    let entries = loadEntries().filter(e => e.boatId !== boatId);
+    let refuels = loadRefuels().filter(r => r.boatId !== boatId);
+    saveBoats(boats);
+    saveEntries(entries);
+    saveRefuels(refuels);
+    renderBoatsTable(boats);
+    renderBoatsSelect(boats);
+    renderEntriesTable();
+    renderRefuelsTable();
+  }
+
+  function deleteEntry(entryId) {
+    if (!confirm('¿Eliminar este registro de horas?')) return;
+    let entries = loadEntries().filter(e => e.id !== entryId);
+    saveEntries(entries);
+    renderEntriesTable();
+  }
+
+  function deleteRefuel(refuelId) {
+    if (!confirm('¿Eliminar este repostaje?')) return;
+    let refuels = loadRefuels().filter(r => r.id !== refuelId);
+    saveRefuels(refuels);
+    renderRefuelsTable();
+  }
+
+  // Exponer funciones para botones inline (iPhone, Safari)
+  window.deleteBoat = deleteBoat;
+  window.deleteEntry = deleteEntry;
+  window.deleteRefuel = deleteRefuel;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const today = new Date().toISOString().slice(0,10);
+    document.getElementById('entryDate').value = today;
+    document.getElementById('refuelDate').value = today;
+    document.getElementById('filterFrom').value = today;
+    document.getElementById('filterTo').value = today;
+
+    let boats = loadBoats();
+    renderBoatsSelect(boats);
+    renderBoatsTable(boats);
+    renderEntriesTable();
+    renderRefuelsTable();
+
+    document.getElementById('addBoatBtn').addEventListener('click', () => {
+      const name = document.getElementById('boatName').value.trim();
+      const consumption = parseFloat(document.getElementById('boatConsumption').value);
+      const initialFuel = parseFloat(document.getElementById('boatInitialFuel').value) || 0;
+      if (!name || isNaN(consumption) || consumption <= 0) {
+        alert('Introduce nombre y consumo correcto.');
+        return;
+      }
+
+      boats = loadBoats();
+      boats.push({
+        id: generateId(),
+        name,
+        consumption,
+        fuel: initialFuel
+      });
+      saveBoats(boats);
+      document.getElementById('boatName').value = '';
+      document.getElementById('boatConsumption').value = '';
+      document.getElementById('boatInitialFuel').value = '0';
+      renderBoatsSelect(boats);
+      renderBoatsTable(boats);
+    });
+
+    document.getElementById('addEntryBtn').addEventListener('click', () => {
+      const date = document.getElementById('entryDate').value;
+      const boatId = document.getElementById('entryBoat').value;
+      const hours = parseFloat(document.getElementById('entryHours').value);
+
+      if (!date || !boatId || isNaN(hours) || hours <= 0) {
+        alert('Rellena fecha, barco y horas correctas.');
+        return;
+      }
+
+      const entries = loadEntries();
+      entries.push({
+        id: generateId(),
+        date,
+        boatId,
+        hours
+      });
+      saveEntries(entries);
+
+      let boats = loadBoats();
+      const boat = boats.find(b => b.id === boatId);
+      if (boat) {
+        const fuelUsed = hours * (boat.consumption || 0);
+        boat.fuel = Math.max(0, (boat.fuel || 0) - fuelUsed);
+        boats = boats.map(b => b.id === boat.id ? boat : b);
+        saveBoats(boats);
+        renderBoatsTable(boats);
+      }
+
+      document.getElementById('entryHours').value = '';
+      renderEntriesTable();
+    });
+
+    document.getElementById('addRefuelBtn').addEventListener('click', () => {
+      const date = document.getElementById('refuelDate').value;
+      const boatId = document.getElementById('refuelBoat').value;
+      const liters = parseFloat(document.getElementById('refuelLiters').value);
+
+      if (!date || !boatId || isNaN(liters) || liters <= 0) {
+        alert('Rellena fecha, barco y litros correctos.');
+        return;
+      }
+
+      let refuels = loadRefuels();
+      refuels.push({
+        id: generateId(),
+        date,
+        boatId,
+        liters
+      });
+      saveRefuels(refuels);
+
+      let boats = loadBoats();
+      const boat = boats.find(b => b.id === boatId);
+      if (boat) {
+        boat.fuel = (boat.fuel || 0) + liters;
+        boats = boats.map(b => b.id === boat.id ? boat : b);
+        saveBoats(boats);
+        renderBoatsTable(boats);
+      }
+
+      document.getElementById('refuelLiters').value = '';
+      renderRefuelsTable();
+    });
+
+    document.getElementById('applyFilterBtn').addEventListener('click', () => {
+      renderEntriesTable();
+    });
+
+    document.getElementById('exportCsvBtn').addEventListener('click', exportCSV);
+    document.getElementById('exportRefuelsCsvBtn').addEventListener('click', exportRefuelsCSV);
+
+    document.getElementById('printBtn').addEventListener('click', () => {
+      window.print();
+    });
+
+    document.getElementById('importCsvBtn').addEventListener('click', () => {
+      const input = document.getElementById('importFile');
+      const file = input.files && input.files[0];
+      if (!file) {
+        alert('Selecciona un archivo CSV de horas primero.');
+        return;
+      }
+      importCSVFromFile(file);
+    });
+
+    document.getElementById('importRefuelsCsvBtn').addEventListener('click', () => {
+      const input = document.getElementById('importRefuelsFile');
+      const file = input.files && input.files[0];
+      if (!file) {
+        alert('Selecciona un archivo CSV de repostajes primero.');
+        return;
+      }
+      importRefuelsCSVFromFile(file);
+    });
+
+    // Registrar service worker para PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(err => {
+        console.error('Error registrando service worker', err);
+      });
+    }
+  });
+</script>
+</body>
+</html>
